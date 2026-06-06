@@ -112,6 +112,3 @@ This project is designed to evolve incrementally:
 - **Pydantic**: Type-safe data validation and serialization
 - **Multi-stage Docker**: Optimizes image size and security
 - **Non-root user**: Security best practice in Docker container
-
-the flow:
-https://chatgpt.com/c/6a217d3e-22b4-83eb-943a-008bd0ec8fa7

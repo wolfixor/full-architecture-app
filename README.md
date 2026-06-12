@@ -139,7 +139,7 @@ REDIS_CACHE_TTL=300           # Cache TTL in seconds (5 minutes)
 
 This project is designed to evolve incrementally:
 
-1. **Phase 1** (Current): Simple monolith with in-memory storage
+1. **Phase 1**: Simple monolith with in-memory storage
 2. **Phase 2**: Add PostgreSQL for persistence
 3. **Phase 3**: **COMPLETE** - Add Redis for caching
 4. **Phase 4**: Split into microservices

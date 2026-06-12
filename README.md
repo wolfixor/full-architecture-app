@@ -15,9 +15,13 @@ app/
 │   └── api.py       # Main API router configuration
 ├── core/            # Core application modules
 │   ├── config.py    # Configuration management
-│   └── logger.py    # Structured logging setup
+│   ├── logger.py    # Structured logging setup
+│   └── redis.py     # Redis client configuration
 ├── models/          # Data models (Pydantic)
 │   └── task.py      # Task data models
+├── repositories/    # Data access layer
+│   ├── task_repository.py    # Database operations
+│   └── cache_repository.py   # Redis caching layer
 ├── services/        # Business logic services
 │   └── task_service.py # Task business logic
 └── main.py         # Application entry point
@@ -32,6 +36,7 @@ app/
 - Graceful shutdown
 - Docker containerization
 - Multi-stage Docker build
+- **Redis caching** for task lookups with automatic invalidation
 
 
 
@@ -92,13 +97,51 @@ curl -X DELETE http://localhost:8000/api/tasks/{id}
 
 See the Kubernetes manifests in the `k8s/` directory for deployment to Kubernetes.
 
+### Deploying with Redis
+
+To deploy with Redis caching:
+
+```bash
+# Apply all Kubernetes manifests
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/pvc.yaml
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/redis.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/alembic-job.yml
+
+# Or apply all at once
+kubectl apply -f k8s/
+```
+
+## Redis Caching Configuration
+
+The application includes Redis caching for task lookups with the following features:
+
+- **Cache Task Lookups**: Task GET operations are cached with 5-minute TTL
+- **Cache Invalidation**: Cache is automatically invalidated on task updates, creation, and deletion
+- **Redis Health Checks**: Integrated into the `/ready` endpoint
+- **Fallback to Database**: If Redis is unavailable, the application falls back to database queries
+
+### Configuration Environment Variables
+
+```bash
+REDIS_HOST=task-api-redis      # Redis service name
+REDIS_PORT=6379               # Redis port
+REDIS_DB=0                    # Redis database number
+REDIS_PASSWORD=               # Redis password (optional)
+REDIS_CACHE_TTL=300           # Cache TTL in seconds (5 minutes)
+```
+
 ## Project Evolution Path
 
 This project is designed to evolve incrementally:
 
 1. **Phase 1** (Current): Simple monolith with in-memory storage
 2. **Phase 2**: Add PostgreSQL for persistence
-3. **Phase 3**: Add Redis for caching
+3. **Phase 3**: **COMPLETE** - Add Redis for caching
 4. **Phase 4**: Split into microservices
 5. **Phase 5**: Add message queue (Kafka/RabbitMQ)
 6. **Phase 6**: Add authentication/authorization

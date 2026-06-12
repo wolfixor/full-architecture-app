@@ -3,9 +3,6 @@ kind: Deployment
 metadata:
   name: task-api
   namespace: task-api
-  labels:
-    app: task-api
-    version: v1
 spec:
   replicas: 2
   selector:
@@ -15,7 +12,6 @@ spec:
     metadata:
       labels:
         app: task-api
-        version: v1
     spec:
       containers:
       - name: task-api
@@ -24,28 +20,61 @@ spec:
         ports:
         - containerPort: 8000
           name: http
-          protocol: TCP
         env:
         - name: PORT
           value: "8000"
         - name: PYTHONUNBUFFERED
           value: "1"
+        - name: POSTGRES_HOST
+          value: postgres
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: POSTGRES_DB
+        - name: REDIS_HOST
+          value: task-api-redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_DB
+          value: "0"
+        - name: REDIS_CACHE_TTL
+          value: "300"
         resources:
           requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
+            cpu: "250m"
             memory: "256Mi"
-            cpu: "200m"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /health
             port: 8000
           initialDelaySeconds: 30
           periodSeconds: 10
-          timeoutSeconds: 3
-          failureThreshold: 3
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "sleep 10"]
+              command:
+                - sh
+                - -c
+                - sleep 10

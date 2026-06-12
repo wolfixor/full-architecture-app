@@ -1,12 +1,12 @@
-FROM docker.arvancloud.ir/python:3.12-slim AS builder
+FROM 185.120.221.119:8083/python:3.12-slim AS builder
 
 WORKDIR /app
 
 # -----------------------
 # Mirrors (YOUR SETUP)
 # -----------------------
-ENV PIP_INDEX_URL=https://mirror2.chabokan.net/pypi/simple/
-ENV PIP_TRUSTED_HOST=mirror2.chabokan.net
+ENV PIP_INDEX_URL=http://185.120.221.119:8081/repository/pypi-group/simple/
+ENV PIP_TRUSTED_HOST=185.120.221.119
 
 ARG NEXUS_URL=http://185.120.221.119:8081
 
@@ -27,41 +27,56 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -vvv
+RUN pip install --no-cache-dir -r requirements.txt -vvv 
 
-# Copy app
+# Copy app and alembic
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 
 
 # -----------------------
 # Runtime stage
 # -----------------------
-FROM docker.arvancloud.ir/python:3.12-slim
+FROM 185.120.221.119:8083/python:3.12-slim
 
 WORKDIR /app
 
-ENV PIP_INDEX_URL=https://mirror2.chabokan.net/pypi/simple/
-ENV PIP_TRUSTED_HOST=mirror2.chabokan.net
+ENV PIP_INDEX_URL=http://185.120.221.119:8081/repository/pypi-group/simple/
+ENV PIP_TRUSTED_HOST=185.120.221.119
 
 ARG NEXUS_URL=http://185.120.221.119:8081
 
-# APT mirror + curl for healthcheck
+# APT mirror + curl + postgres client + redis tools for wait script
 RUN set -ex \
     && rm -rf /etc/apt/sources.list.d/* \
     && echo "deb ${NEXUS_URL}/repository/debian-13/ trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list \
     && echo "deb ${NEXUS_URL}/repository/debian-13-security/ trixie-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y curl \
+    && apt-get install -y curl postgresql-client redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy venv + app
+# Copy venv + app + alembic
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/app ./app
+COPY --from=builder /app/alembic ./alembic
+COPY --from=builder /app/alembic.ini .
+
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+
+# Database connection env vars (override if needed)
+# ENV POSTGRES_DB=taskapi
+# ENV POSTGRES_USER=postgres
+# ENV POSTGRES_PASSWORD=postgres
+# ENV POSTGRES_HOST=task-api-db
+# ENV POSTGRES_PORT=5432
 
 # Create user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -69,8 +84,9 @@ USER appuser
 
 EXPOSE 8000
 
+# Use entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Healthcheck (curl version)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl --fail --silent --show-error http://localhost:8000/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,73 @@
+services:
+  task-api:
+    working_dir: /app
+    build: .
+    volumes:
+      - ./alembic/versions:/app/alembic/versions
+    environment:
+      - POSTGRES_HOST=task-api-db 
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=taskapi
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=task-api-redis
+      - REDIS_PORT=6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      task-api-db:
+        condition: service_healthy
+      task-api-redis:
+        condition: service_healthy
+    networks:
+      - task-api-network
+    restart: unless-stopped
+
+  task-api-db:
+    image: 185.120.221.119:8083/postgres:17.10-alpine3.22
+    environment:
+      POSTGRES_DB: taskapi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./place-data/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - task-api-network
+    restart: unless-stopped
+
+  task-api-redis:
+    image: 185.120.221.119:8083/redis:7.4-alpine
+    environment:
+      REDIS_HOST: task-api-redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_CACHE_TTL: 300
+      REDIS_PASSWORD: ""
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./place-data/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - task-api-network
+    restart: unless-stopped
+
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  task-api-network:
+    driver: bridge
